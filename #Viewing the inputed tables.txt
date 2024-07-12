@@ -1,0 +1,92 @@
+https://console.cloud.google.com/bigquery?sq=492663079411:4e08b7e7c14b47b590b84e7296869671&project=kaggle-429122&ws=!1m4!1m3!8m2!1s492663079411!2s4e08b7e7c14b47b590b84e7296869671
+
+#Viewing the inputed tables
+SELECT *
+  FROM `kaggle-429122.Covid_VAC.Covidvac`
+  Order by 3,4;
+
+SELECT *
+  FROM `kaggle-429122.Covid_VAC.Coviddeaths`
+  Order by 3,4;
+
+
+#selecting variables
+SELECT location, date, total_cases, new_cases, total_deaths, population
+  FROM `kaggle-429122.Covid_VAC.Coviddeaths`
+  Order by 1,2;
+
+#Total cases against deaths
+SELECT location, total_cases, total_deaths, ((total_deaths/total_cases) * 100) as death_percent
+  FROM `kaggle-429122.Covid_VAC.Coviddeaths`
+  Order by 1;
+#Total cases against population
+SELECT location, date, total_cases, population, ((total_cases/population) * 100) as case_percentage
+  FROM `kaggle-429122.Covid_VAC.Coviddeaths`
+  Order by 1,2;
+
+#Highest infection and infection rate by country
+SELECT location as Country, Max(population) as Country_Population, MAX(total_cases) as Total_Cases, MAX((total_cases/population) * 100) as Infected_Population_Percentage
+  FROM `kaggle-429122.Covid_VAC.Coviddeaths`
+  Where continent is not null #some continents are added into the loaction column and left empty in the continent column
+  Group by 1
+  Order by 3 desc;
+
+#Death rate and deaths by country
+SELECT location as Country, Max(population) as Country_Population, sum(new_deaths) as Total_Deaths, max(total_deaths/total_cases) * 100 as Death_rate
+  FROM `kaggle-429122.Covid_VAC.Coviddeaths`
+  Where continent is not null #some continents are added into the loaction column and left empty in the continent column
+  Group by 1
+  Order by 3 desc;
+
+#Continent data
+SELECT continent as Continent, Max(population) as Continent_Population, Sum(new_cases) as Total_Cases,Sum(new_deaths) as Total_Deaths, (sum(new_deaths)/ sum(new_cases))*100 as Death_Rate
+  FROM `kaggle-429122.Covid_VAC.Coviddeaths`
+  Where continent is not null #some continents are added into the loaction column and left empty in the continent column
+  Group by 1
+  Order by 3 desc;
+
+
+
+-- Drop the temporary table if it exists
+DROP TABLE IF EXISTS `kaggle-429122.Covid_VAC.Vaccination_Details`;
+
+-- Create the temporary table with the corrected column names and data types
+CREATE TABLE `kaggle-429122.Covid_VAC.Vaccination_Details`
+(
+  Continent String,
+  Location_Country String,
+  Total_Population numeric,
+  Partially_Vaccinated numeric,
+  Percentage_Partially_Vaccinated numeric,
+  Fully_Vaccinated numeric, 
+  Percentage_Fully_Vaccinated numeric,
+  Peak_Infections numeric,
+  Deaths numeric
+);
+
+-- Insert the vaccination, infection, and death details per continent and country
+INSERT INTO `kaggle-429122.Covid_VAC.Vaccination_Details`
+SELECT 
+    death.continent as Continenet, 
+    death.location AS Location_Country, 
+    MAX(death.population) AS Total_Population, 
+    MAX(vac.people_vaccinated) AS Partially_Vaccinated, 
+    (MAX(vac.people_vaccinated) / MAX(death.population)) * 100 AS Percentage_Partially_Vaccinated, 
+    MAX(vac.people_fully_vaccinated) AS Fully_Vaccinated, 
+    (MAX(vac.people_fully_vaccinated) / MAX(death.population)) * 100 AS Percentage_Fully_Vaccinated, 
+    MAX(death.total_cases) AS Peak_Infections, 
+    MAX(death.total_deaths) AS Deaths
+FROM 
+    `kaggle-429122.Covid_VAC.Coviddeaths` death
+JOIN 
+    `kaggle-429122.Covid_VAC.Covidvac` vac
+ON 
+    death.location = vac.location 
+    AND death.date = vac.date
+WHERE 
+    death.continent IS NOT NULL
+GROUP BY 
+    death.continent, 
+    death.location
+ORDER BY 
+    Partially_Vaccinated DESC;
